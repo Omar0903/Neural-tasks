@@ -2,12 +2,11 @@ import pandas as pd
 import numpy as np
 from sklearn.preprocessing import LabelEncoder
 from tkinter import messagebox
+import matplotlib.pyplot as plt
 
-# -----------------------------
-# FUNCTIONS
-# -----------------------------
+
+
 def signum(x):
-    """تحديد الإشارة"""
     if x > 0:
         return 1
     elif x == 0:
@@ -17,7 +16,6 @@ def signum(x):
 
 
 def PerceptronTrain(X, T, eta=0.01, epochs=10, useBias=True):
-    """تدريب نموذج Perceptron"""
     numberOfSamples = len(X)
     numberOfFeatures = len(X[0])
     Weights = np.random.randn(numberOfFeatures)
@@ -34,7 +32,6 @@ def PerceptronTrain(X, T, eta=0.01, epochs=10, useBias=True):
 
 
 def AdalineTrain(X, T, eta=0.01, epochs=100, mseThreshold=0.001, useBias=True):
-    """تدريب نموذج ADALINE"""
     numberOfSamples = len(X)
     numberOfFeatures = len(X[0])
     Weights = np.random.randn(numberOfFeatures)
@@ -51,27 +48,20 @@ def AdalineTrain(X, T, eta=0.01, epochs=100, mseThreshold=0.001, useBias=True):
             bias += eta * np.mean(errors)
     return Weights, bias, mse
 
-
-# -----------------------------
-# DATA PREPARATION
-# -----------------------------
 dataFrame = pd.read_csv("penguins.csv")
 
-# معالجة القيم المفقودة
-for col in ['CulmenLength', 'CulmenDepth', 'BodyMass', 'FlipperLength']:
-    dataFrame[col] = dataFrame[col].fillna(dataFrame[col].mean())
 
-# ترميز الأعمدة الفئوية
+dataFrame['CulmenLength']=dataFrame['CulmenLength'].fillna(dataFrame['CulmenLength'].mean())
+dataFrame['CulmenDepth']=dataFrame['CulmenDepth'].fillna(dataFrame['CulmenDepth'].mean())
+dataFrame['BodyMass']=dataFrame['BodyMass'].fillna(dataFrame['BodyMass'].mean())
+dataFrame['FlipperLength']=dataFrame['FlipperLength'].fillna(dataFrame['FlipperLength'].mean())
+
+
 labelEncoding = LabelEncoder()
 dataFrame["OriginLocation"] = labelEncoding.fit_transform(dataFrame["OriginLocation"])
+dataFrame["Target"] = LabelEncoder().fit_transform(dataFrame["Species"])
 
-# تحديد 150 صف فقط لتقليل البيانات
-dataFrame = dataFrame.iloc[:150].reset_index(drop=True)
-dataFrame["Target"] = [0]*50 + [1]*50 + [2]*50
 
-# -----------------------------
-# الخرائط الخاصة بالـ Features و Classes
-# -----------------------------
 featureMap = {
     'Culmen Length and Culmen Depth': ('CulmenLength', 'CulmenDepth'),
     'Culmen Length and Flipper Length': ('CulmenLength', 'FlipperLength'),
@@ -92,12 +82,33 @@ classMap = {
 }
 
 
-# -----------------------------
-# RUN MODEL FUNCTION (يتم استدعاؤها من GUI)
-# -----------------------------
+
+
+
+def plotDecisionBoundary(X, T, W, b, title="Decision Boundary"):
+    if X.shape[1] != 2:
+        raise ValueError("X must have exactly two features for 2D plotting")
+
+    x_min, x_max = X[:, 0].min() - 1, X[:, 0].max() + 1
+    y_min, y_max = X[:, 1].min() - 1, X[:, 1].max() + 1
+
+    x_vals = np.linspace(x_min, x_max, 200)
+    y_vals = -(W[0] * x_vals + b) / W[1]
+
+    plt.figure(figsize=(8, 6))
+    plt.scatter(X[T == -1, 0], X[T == -1, 1], color='red', label='Class -1')
+    plt.scatter(X[T == 1, 0], X[T == 1, 1], color='blue', label='Class 1')
+    plt.plot(x_vals, y_vals, 'k--', linewidth=2, label='Decision Boundary')
+    plt.xlabel('Feature 1')
+    plt.ylabel('Feature 2')
+    plt.title(title)
+    plt.legend()
+    plt.grid(True)
+    plt.show()
+
+
 def RunModel(En1, En2, En3, cmbo1, cmbo2, cmbo3, biasOption):
     try:
-        # قراءة المدخلات من الواجهة
         epochs = int(En1.get())
         mseThreshold = float(En2.get())
         eta = float(En3.get())
@@ -109,10 +120,8 @@ def RunModel(En1, En2, En3, cmbo1, cmbo2, cmbo3, biasOption):
         featureOne, featureTwo = featureMap[selectFeature]
         ClassOne, ClassTwo = classMap[selectClasses]
 
-        # تجهيز subset من البيانات للـ classes المطلوبة
         subset = dataFrame[(dataFrame["Target"] == ClassOne) | (dataFrame["Target"] == ClassTwo)]
 
-        # تقسيم Train/Test
         train_ClassOne = subset[subset["Target"] == ClassOne].sample(n=30, random_state=42)
         test_ClassOne = subset[subset["Target"] == ClassOne].drop(train_ClassOne.index)
         train_ClassTwo = subset[subset["Target"] == ClassTwo].sample(n=30, random_state=42)
@@ -121,21 +130,17 @@ def RunModel(En1, En2, En3, cmbo1, cmbo2, cmbo3, biasOption):
         train_df = pd.concat([train_ClassOne, train_ClassTwo]).sample(frac=1, random_state=42)
         test_df = pd.concat([test_ClassOne, test_ClassTwo]).sample(frac=1, random_state=42)
 
-        # تعديل الهدف إلى +1 و -1
         train_df["Target"] = train_df["Target"].apply(lambda x: 1 if x == ClassOne else -1)
         test_df["Target"] = test_df["Target"].apply(lambda x: 1 if x == ClassOne else -1)
 
-        # استخراج القيم
         X_train = train_df[[featureOne, featureTwo]].values.astype(float)
         T_train = train_df["Target"].values
         X_test = test_df[[featureOne, featureTwo]].values.astype(float)
         T_test = test_df["Target"].values
 
-        # التطبيع Normalization
         X_train = (X_train - X_train.mean(axis=0)) / X_train.std(axis=0)
         X_test = (X_test - X_test.mean(axis=0)) / X_test.std(axis=0)
 
-        # تدريب النموذج
         if algorithm == "Perceptron":
             W, b = PerceptronTrain(X_train, T_train, eta=eta, epochs=epochs, useBias=useBias)
             mse = None
@@ -143,15 +148,15 @@ def RunModel(En1, En2, En3, cmbo1, cmbo2, cmbo3, biasOption):
             W, b, mse = AdalineTrain(X_train, T_train, eta=eta, epochs=epochs,
                                       mseThreshold=mseThreshold, useBias=useBias)
 
-        # التنبؤ والاختبار
         preds = np.array([signum(np.dot(W, x_i) + b) for x_i in X_test])
         acc = np.mean(preds == T_test)
 
-        # عرض النتيجة
         msg = f"Dataset: class_{ClassOne}_{ClassTwo}\nFeatures: ({featureOne}, {featureTwo})\nAccuracy: {acc*100:.2f}%"
         if algorithm == "Adaline" and mse is not None:
             msg += f"\nFinal MSE: {mse:.6f}"
         messagebox.showinfo("Result", msg)
+
+        plotDecisionBoundary(X_train, T_train, W, b, title=f"{algorithm} Decision Boundary")
 
     except Exception as e:
         messagebox.showerror("Error", str(e))
