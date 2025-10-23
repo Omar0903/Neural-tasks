@@ -1,7 +1,6 @@
 from tkinter import *
 from tkinter import ttk
-from functions import RunModel, featureMap, classMap
-
+from test_function import *
 
 MainScreen = Tk()
 MainScreen.geometry('1200x720')
@@ -111,8 +110,8 @@ runBtn = Button(fr1, text="Run Model", bg="green", fg="white", font=15,
                 command=lambda: RunModel(En1, En2, En3, cmbo1, cmbo2, cmbo3, biasOption))
 runBtn.place(x=950, y=400, width=150, height=40)
 
-testSampleBtn = Button(fr1, text="test sample", bg="green", fg="white", font=15,
-                command=lambda: RunModel(En1, En2, En3, cmbo1, cmbo2, cmbo3, biasOption))
+testSampleBtn = Button(fr1, text="Test Sample", bg="green", fg="white", font=15,
+                command=lambda: TestSample(En4, En5, En6, En7, En8, En9))
 testSampleBtn.place(x=750, y=400, width=150, height=40)
 
 MainScreen.mainloop()

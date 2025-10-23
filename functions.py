@@ -5,14 +5,8 @@ from tkinter import messagebox
 import matplotlib.pyplot as plt
 
 
-
 def signum(x):
-    if x > 0:
-        return 1
-    elif x == 0:
-        return 0
-    else:
-        return -1
+    return 1 if x >= 0 else -1
 
 
 def PerceptronTrain(X, T, eta=0.01, epochs=10, useBias=True):
@@ -48,19 +42,16 @@ def AdalineTrain(X, T, eta=0.01, epochs=100, mseThreshold=0.001, useBias=True):
             bias += eta * np.mean(errors)
     return Weights, bias, mse
 
+
 dataFrame = pd.read_csv("penguins.csv")
 
-
-dataFrame['CulmenLength']=dataFrame['CulmenLength'].fillna(dataFrame['CulmenLength'].mean())
-dataFrame['CulmenDepth']=dataFrame['CulmenDepth'].fillna(dataFrame['CulmenDepth'].mean())
-dataFrame['BodyMass']=dataFrame['BodyMass'].fillna(dataFrame['BodyMass'].mean())
-dataFrame['FlipperLength']=dataFrame['FlipperLength'].fillna(dataFrame['FlipperLength'].mean())
-
+for col in ['CulmenLength', 'CulmenDepth', 'BodyMass', 'FlipperLength']:
+    dataFrame[col] = dataFrame[col].fillna(dataFrame[col].mean())
 
 labelEncoding = LabelEncoder()
 dataFrame["OriginLocation"] = labelEncoding.fit_transform(dataFrame["OriginLocation"])
-dataFrame["Target"] = LabelEncoder().fit_transform(dataFrame["Species"])
-
+speciesEncoder = LabelEncoder()
+dataFrame["Target"] = speciesEncoder.fit_transform(dataFrame["Species"])
 
 featureMap = {
     'Culmen Length and Culmen Depth': ('CulmenLength', 'CulmenDepth'),
@@ -80,9 +71,6 @@ classMap = {
     'Adelie and Chinstrap': (0, 2),
     'Chinstrap and Gentoo': (1, 2),
 }
-
-
-
 
 
 def plotDecisionBoundary(X, T, W, b, title="Decision Boundary"):
@@ -130,16 +118,18 @@ def RunModel(En1, En2, En3, cmbo1, cmbo2, cmbo3, biasOption):
         train_df = pd.concat([train_ClassOne, train_ClassTwo]).sample(frac=1, random_state=42)
         test_df = pd.concat([test_ClassOne, test_ClassTwo]).sample(frac=1, random_state=42)
 
-        train_df["Target"] = train_df["Target"].apply(lambda x: 1 if x == ClassOne else -1)
-        test_df["Target"] = test_df["Target"].apply(lambda x: 1 if x == ClassOne else -1)
+        train_df["Target"] = train_df["Target"].apply(lambda x: -1 if x == ClassOne else 1)
+        test_df["Target"] = test_df["Target"].apply(lambda x: -1 if x == ClassOne else 1)
 
         X_train = train_df[[featureOne, featureTwo]].values.astype(float)
         T_train = train_df["Target"].values
         X_test = test_df[[featureOne, featureTwo]].values.astype(float)
         T_test = test_df["Target"].values
 
-        X_train = (X_train - X_train.mean(axis=0)) / X_train.std(axis=0)
-        X_test = (X_test - X_test.mean(axis=0)) / X_test.std(axis=0)
+        X_mean = X_train.mean(axis=0)
+        X_std = X_train.std(axis=0)
+        X_train = (X_train - X_mean) / X_std
+        X_test = (X_test - X_mean) / X_std
 
         if algorithm == "Perceptron":
             W, b = PerceptronTrain(X_train, T_train, eta=eta, epochs=epochs, useBias=useBias)
@@ -151,12 +141,63 @@ def RunModel(En1, En2, En3, cmbo1, cmbo2, cmbo3, biasOption):
         preds = np.array([signum(np.dot(W, x_i) + b) for x_i in X_test])
         acc = np.mean(preds == T_test)
 
-        msg = f"Dataset: class_{ClassOne}_{ClassTwo}\nFeatures: ({featureOne}, {featureTwo})\nAccuracy: {acc*100:.2f}%"
+        global lastModel
+        lastModel = {
+            "W": W,
+            "b": b,
+            "featureOne": featureOne,
+            "featureTwo": featureTwo,
+            "ClassOne": ClassOne,
+            "ClassTwo": ClassTwo,
+            "algorithm": algorithm,
+            "X_mean": X_mean,
+            "X_std": X_std,
+            "classNames": speciesEncoder.inverse_transform([ClassOne, ClassTwo])
+        }
+
+        msg = f"Dataset: {selectClasses}\nFeatures: ({featureOne}, {featureTwo})\nAccuracy: {acc*100:.2f}%"
         if algorithm == "Adaline" and mse is not None:
             msg += f"\nFinal MSE: {mse:.6f}"
-        messagebox.showinfo("Result", msg)
 
+        messagebox.showinfo("Result", msg)
         plotDecisionBoundary(X_train, T_train, W, b, title=f"{algorithm} Decision Boundary")
 
+    except Exception as e:
+        messagebox.showerror("Error", str(e))
+
+
+def TestSample(En4, En5, En6, En7, En8, En9):
+    try:
+        global lastModel
+        if 'lastModel' not in globals():
+            messagebox.showerror("Error", "Please train the model first!")
+            return
+
+        W = lastModel["W"]
+        b = lastModel["b"]
+        X_mean = lastModel["X_mean"]
+        X_std = lastModel["X_std"]
+        featureOne = lastModel["featureOne"]
+        featureTwo = lastModel["featureTwo"]
+        ClassOne = lastModel["ClassOne"]
+        ClassTwo = lastModel["ClassTwo"]
+        classNames = lastModel["classNames"]
+
+        # read numeric input
+        sample = np.array([
+            float(En6.get()),  # Culmen Length
+            float(En5.get())   # Culmen Depth
+        ])
+
+        # normalize
+        sample = (sample - X_mean) / X_std
+
+        pred = signum(np.dot(W, sample) + b)
+
+        predicted_name = classNames[0] if pred == -1 else classNames[1]
+        messagebox.showinfo("Prediction Result", f"Predicted Species: {predicted_name}")
+
+    except ValueError:
+        messagebox.showerror("Error", "Please enter valid numeric values for all features!")
     except Exception as e:
         messagebox.showerror("Error", str(e))
