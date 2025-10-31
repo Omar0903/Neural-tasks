@@ -6,7 +6,12 @@ import matplotlib.pyplot as plt
 
 
 def signum(x):
-    return 1 if x >= 0 else -1
+    if x > 0:
+        return 1
+    elif x == 0:
+        return 0
+    else:
+        return -1
 
 
 def PerceptronTrain(X, T, eta=0.01, epochs=10, useBias=True):
@@ -14,7 +19,6 @@ def PerceptronTrain(X, T, eta=0.01, epochs=10, useBias=True):
     numberOfFeatures = len(X[0])
     Weights = np.random.randn(numberOfFeatures)
     bias = np.random.randn() if useBias else 0
-
     for _ in range(epochs):
         for i in range(numberOfSamples):
             Output = signum(np.dot(Weights, X[i]) + bias)
@@ -30,7 +34,6 @@ def AdalineTrain(X, T, eta=0.01, epochs=100, mseThreshold=0.001, useBias=True):
     numberOfFeatures = len(X[0])
     Weights = np.random.randn(numberOfFeatures)
     bias = np.random.randn() if useBias else 0
-
     for epoch in range(epochs):
         Y = np.dot(X, Weights) + bias
         errors = T - Y
@@ -44,14 +47,13 @@ def AdalineTrain(X, T, eta=0.01, epochs=100, mseThreshold=0.001, useBias=True):
 
 
 dataFrame = pd.read_csv("penguins.csv")
-
-for col in ['CulmenLength', 'CulmenDepth', 'BodyMass', 'FlipperLength']:
-    dataFrame[col] = dataFrame[col].fillna(dataFrame[col].mean())
-
+dataFrame['CulmenLength'] = dataFrame['CulmenLength'].fillna(dataFrame['CulmenLength'].mean())
+dataFrame['CulmenDepth'] = dataFrame['CulmenDepth'].fillna(dataFrame['CulmenDepth'].mean())
+dataFrame['BodyMass'] = dataFrame['BodyMass'].fillna(dataFrame['BodyMass'].mean())
+dataFrame['FlipperLength'] = dataFrame['FlipperLength'].fillna(dataFrame['FlipperLength'].mean())
 labelEncoding = LabelEncoder()
 dataFrame["OriginLocation"] = labelEncoding.fit_transform(dataFrame["OriginLocation"])
-speciesEncoder = LabelEncoder()
-dataFrame["Target"] = speciesEncoder.fit_transform(dataFrame["Species"])
+dataFrame["Target"] = LabelEncoder().fit_transform(dataFrame["Species"])
 
 featureMap = {
     'Culmen Length and Culmen Depth': ('CulmenLength', 'CulmenDepth'),
@@ -73,26 +75,30 @@ classMap = {
 }
 
 
-def plotDecisionBoundary(X, T, W, b, title="Decision Boundary"):
+def plotDecisionBoundary(X, T, W, b, featureOne, featureTwo, classNames, title="Decision Boundary (Test Data)"):
     if X.shape[1] != 2:
         raise ValueError("X must have exactly two features for 2D plotting")
 
-    x_min, x_max = X[:, 0].min() - 1, X[:, 0].max() + 1
-    y_min, y_max = X[:, 1].min() - 1, X[:, 1].max() + 1
 
+    x_min, x_max = X[:, 0].min() - 1, X[:, 0].max() + 1
     x_vals = np.linspace(x_min, x_max, 200)
     y_vals = -(W[0] * x_vals + b) / W[1]
 
     plt.figure(figsize=(8, 6))
-    plt.scatter(X[T == -1, 0], X[T == -1, 1], color='red', label='Class -1')
-    plt.scatter(X[T == 1, 0], X[T == 1, 1], color='blue', label='Class 1')
+
+    plt.scatter(X[T == -1, 0], X[T == -1, 1], color='red', label=classNames[0])
+    plt.scatter(X[T == 1, 0], X[T == 1, 1], color='blue', label=classNames[1])
+
     plt.plot(x_vals, y_vals, 'k--', linewidth=2, label='Decision Boundary')
-    plt.xlabel('Feature 1')
-    plt.ylabel('Feature 2')
+
+    plt.xlabel(featureOne)
+    plt.ylabel(featureTwo)
     plt.title(title)
     plt.legend()
     plt.grid(True)
     plt.show()
+
+
 
 
 def RunModel(En1, En2, En3, cmbo1, cmbo2, cmbo3, biasOption):
@@ -104,43 +110,33 @@ def RunModel(En1, En2, En3, cmbo1, cmbo2, cmbo3, biasOption):
         selectClasses = cmbo2.get()
         algorithm = cmbo3.get()
         useBias = (biasOption.get() == "Yes")
-
         featureOne, featureTwo = featureMap[selectFeature]
         ClassOne, ClassTwo = classMap[selectClasses]
-
+        classNames = selectClasses.split(" and ")
         subset = dataFrame[(dataFrame["Target"] == ClassOne) | (dataFrame["Target"] == ClassTwo)]
-
         train_ClassOne = subset[subset["Target"] == ClassOne].sample(n=30, random_state=42)
         test_ClassOne = subset[subset["Target"] == ClassOne].drop(train_ClassOne.index)
         train_ClassTwo = subset[subset["Target"] == ClassTwo].sample(n=30, random_state=42)
         test_ClassTwo = subset[subset["Target"] == ClassTwo].drop(train_ClassTwo.index)
-
         train_df = pd.concat([train_ClassOne, train_ClassTwo]).sample(frac=1, random_state=42)
         test_df = pd.concat([test_ClassOne, test_ClassTwo]).sample(frac=1, random_state=42)
-
-        train_df["Target"] = train_df["Target"].apply(lambda x: -1 if x == ClassOne else 1)
-        test_df["Target"] = test_df["Target"].apply(lambda x: -1 if x == ClassOne else 1)
-
+        train_df["Target"] = train_df["Target"].apply(lambda x: 1 if x == ClassTwo else -1)
+        test_df["Target"] = test_df["Target"].apply(lambda x: 1 if x == ClassTwo else -1)
         X_train = train_df[[featureOne, featureTwo]].values.astype(float)
         T_train = train_df["Target"].values
         X_test = test_df[[featureOne, featureTwo]].values.astype(float)
         T_test = test_df["Target"].values
-
         X_mean = X_train.mean(axis=0)
         X_std = X_train.std(axis=0)
         X_train = (X_train - X_mean) / X_std
         X_test = (X_test - X_mean) / X_std
-
         if algorithm == "Perceptron":
             W, b = PerceptronTrain(X_train, T_train, eta=eta, epochs=epochs, useBias=useBias)
             mse = None
         else:
-            W, b, mse = AdalineTrain(X_train, T_train, eta=eta, epochs=epochs,
-                                      mseThreshold=mseThreshold, useBias=useBias)
-
+            W, b, mse = AdalineTrain(X_train, T_train, eta=eta, epochs=epochs, mseThreshold=mseThreshold, useBias=useBias)
         preds = np.array([signum(np.dot(W, x_i) + b) for x_i in X_test])
         acc = np.mean(preds == T_test)
-
         global lastModel
         lastModel = {
             "W": W,
@@ -152,16 +148,13 @@ def RunModel(En1, En2, En3, cmbo1, cmbo2, cmbo3, biasOption):
             "algorithm": algorithm,
             "X_mean": X_mean,
             "X_std": X_std,
-            "classNames": speciesEncoder.inverse_transform([ClassOne, ClassTwo])
+            "ClassNames": classNames
         }
-
-        msg = f"Dataset: {selectClasses}\nFeatures: ({featureOne}, {featureTwo})\nAccuracy: {acc*100:.2f}%"
+        msg = f"Dataset: {classNames[0]} vs {classNames[1]}\nFeatures: ({featureOne}, {featureTwo})\nAccuracy: {acc*100:.2f}%"
         if algorithm == "Adaline" and mse is not None:
             msg += f"\nFinal MSE: {mse:.6f}"
-
         messagebox.showinfo("Result", msg)
-        plotDecisionBoundary(X_train, T_train, W, b, title=f"{algorithm} Decision Boundary")
-
+        plotDecisionBoundary(X_test, T_test, W, b, featureOne, featureTwo, classNames, title=f"{algorithm} Test Data with Boundary")
     except Exception as e:
         messagebox.showerror("Error", str(e))
 
@@ -172,31 +165,22 @@ def TestSample(En4, En5, En6, En7, En8, En9):
         if 'lastModel' not in globals():
             messagebox.showerror("Error", "Please train the model first!")
             return
-
         W = lastModel["W"]
         b = lastModel["b"]
         X_mean = lastModel["X_mean"]
         X_std = lastModel["X_std"]
         featureOne = lastModel["featureOne"]
         featureTwo = lastModel["featureTwo"]
-        ClassOne = lastModel["ClassOne"]
-        ClassTwo = lastModel["ClassTwo"]
-        classNames = lastModel["classNames"]
-
-        # read numeric input
+        classNames = lastModel["ClassNames"]
         sample = np.array([
-            float(En6.get()),  # Culmen Length
-            float(En5.get())   # Culmen Depth
+            float(En6.get()),
+            float(En5.get())
         ])
-
-        # normalize
         sample = (sample - X_mean) / X_std
-
-        pred = signum(np.dot(W, sample) + b)
-
-        predicted_name = classNames[0] if pred == -1 else classNames[1]
-        messagebox.showinfo("Prediction Result", f"Predicted Species: {predicted_name}")
-
+        pred = np.dot(W, sample) + b
+        pred = 1 if pred >= 0 else -1
+        predicted_class = classNames[1] if pred == 1 else classNames[0]
+        messagebox.showinfo("Prediction Result", f"Predicted Species: {predicted_class}")
     except ValueError:
         messagebox.showerror("Error", "Please enter valid numeric values for all features!")
     except Exception as e:
