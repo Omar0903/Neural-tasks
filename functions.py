@@ -137,6 +137,8 @@ def RunModel(En1, En2, En3, cmbo1, cmbo2, cmbo3, biasOption):
             W, b, mse = AdalineTrain(X_train, T_train, eta=eta, epochs=epochs, mseThreshold=mseThreshold, useBias=useBias)
         preds = np.array([signum(np.dot(W, x_i) + b) for x_i in X_test])
         acc = np.mean(preds == T_test)
+        matrix, acc = confusionMatrix(T_test, preds, classNames)
+
         global lastModel
         lastModel = {
             "W": W,
@@ -158,6 +160,37 @@ def RunModel(En1, En2, En3, cmbo1, cmbo2, cmbo3, biasOption):
     except Exception as e:
         messagebox.showerror("Error", str(e))
 
+def confusionMatrix(y_true, y_pred, classNames):
+    TP = TN = FP = FN = 0
+
+    for true, pred in zip(y_true, y_pred):
+        if true == 1 and pred == 1:
+            TP += 1
+        elif true == -1 and pred == -1:
+            TN += 1
+        elif true == -1 and pred == 1:
+            FP += 1
+        elif true == 1 and pred == -1:
+            FN += 1
+
+    matrix = np.array([[TP, FN],
+                       [FP, TN]])
+
+    accuracy = (TP + TN) / (TP + TN + FP + FN)
+
+    msg = (
+        "Confusion Matrix:\n"
+        "*******************\n"
+        f"                            Predicted {classNames[1]}    Predicted {classNames[0]}\n"
+        f"Actual {classNames[1]}             {TP:>4}                            {FN:>4}\n"
+        f"Actual {classNames[0]}              {FP:>4}                              {TN:>4}\n\n"
+        f"Accuracy: {accuracy * 100:.2f}%"
+    )
+
+    # Show in messagebox
+    messagebox.showinfo("Confusion Matrix", msg)
+
+    return matrix, accuracy
 
 def TestSample(En4, En5, En6, En7, En8, En9):
     try:

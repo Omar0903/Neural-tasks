@@ -1,6 +1,6 @@
 from tkinter import *
 from tkinter import ttk
-from test_function import *
+from functions import *
 
 MainScreen = Tk()
 MainScreen.geometry('1200x720')
